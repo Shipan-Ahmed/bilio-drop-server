@@ -13,7 +13,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cors());
 
 
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const uri = "mongodb+srv://biblio-drop:9LLVOdy216YfYfMH@cluster0.oldm8ln.mongodb.net/?appName=Cluster0";
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -33,10 +33,13 @@ async function run() {
         const booksCollection = database.collection("books");
 
 
-        // get all books
+        // get  books based on librarianId
         app.get('/api/books', async (req, res) => {
             try {
-                const books = await booksCollection.find().toArray();
+                const librarianId = req.query.librarianId;
+                console.log("Received librarianId:", librarianId);
+                const query = librarianId? { librarianId: librarianId } : {};
+                const books = await booksCollection.find(query).toArray();
                 res.status(200).json(books);
             } catch (error) {
                 console.error('Error fetching books:', error);
@@ -54,6 +57,24 @@ async function run() {
             catch (error) {
                 console.error('Error adding book:', error);
                 res.status(500).json({ message: 'Internal server error' });
+            }
+        })
+
+        // delete a book by id
+        app.delete('/api/books/:id', async (req, res) => {
+            try {
+                const bookId = req.params.id;
+                const query = {_id: new ObjectId(bookId)};
+                const result = await booksCollection.deleteOne(query);
+                if (result.deletedCount === 1) {
+                    res.status(200).json({ message: 'Book deleted successfully', success: true });
+                } else {
+                    res.status(404).json({ message: 'Book not found', success: false });
+                }
+            }
+            catch (error) {
+                console.error('Error deleting book:', error);
+                res.status(500).json({ message: 'Internal server error', success: false });
             }
         })
 
