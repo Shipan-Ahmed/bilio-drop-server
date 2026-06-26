@@ -29,6 +29,40 @@ async function run() {
     try {
         // Connect the client to the server	(optional starting in v4.7)
         await client.connect();
+        const database = client.db("biblio-drop");
+        const booksCollection = database.collection("books");
+
+
+        // get all books
+        app.get('/api/books', async (req, res) => {
+            try {
+                const books = await booksCollection.find().toArray();
+                res.status(200).json(books);
+            } catch (error) {
+                console.error('Error fetching books:', error);
+                res.status(500).json({ message: 'Internal server error' });
+            }
+        });
+
+        // add a new book 
+        app.post('/api/books', async (req, res) => {
+            try {
+                const bookData = req.body;
+                const result = await booksCollection.insertOne(bookData);
+                res.status(201).json({ message: 'Book added successfully', bookId: result.insertedId });
+            }
+            catch (error) {
+                console.error('Error adding book:', error);
+                res.status(500).json({ message: 'Internal server error' });
+            }
+        })
+
+
+
+
+
+
+
         // Send a ping to confirm a successful connection
         await client.db("admin").command({ ping: 1 });
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
