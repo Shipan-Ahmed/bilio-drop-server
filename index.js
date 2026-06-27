@@ -32,6 +32,35 @@ async function run() {
         const database = client.db("biblio-drop");
         const booksCollection = database.collection("books");
 
+        // get all books
+        app.get('/api/allbooks', async (req, res) => {
+            try {
+                const books = await booksCollection.find({}).toArray();
+                res.status(200).json(books);
+            }
+            catch (error) {
+                console.error('Error fetching books:', error);
+                res.status(500).json({ message: 'Internal server error' });
+            }
+        });
+
+        // book details by id
+        app.get('/api/books/:id', async (req, res) => {
+            try {
+                const bookId = req.params.id;
+                const query = { _id: new ObjectId(bookId) };
+                const book = await booksCollection.findOne(query);
+                if (book) {
+                    res.status(200).json(book);
+                } else {
+                    res.status(404).json({ message: 'Book not found' });
+                }
+            }
+            catch (error) {
+                console.error('Error fetching book details:', error);
+                res.status(500).json({ message: 'Internal server error' });
+            }
+        });
 
         // get  books based on librarianId
         app.get('/api/books', async (req, res) => {
@@ -78,9 +107,24 @@ async function run() {
             }
         })
 
-
-
-
+        // update a book by id
+        app.patch('/api/books/:id/unpublish', async (req, res) => {
+            try {
+                const bookId = req.params.id;
+                const query = { _id: new ObjectId(bookId) };
+                const update = { $set: { status: 'Unpublished' } };
+                const result = await booksCollection.updateOne(query, update);
+                if (result.modifiedCount === 1) {
+                    res.status(200).json({ message: 'Book unpublished successfully', success: true });
+                } else {
+                    res.status(404).json({ message: 'Book not found', success: false });
+                }
+            }
+            catch (error) {
+                console.error('Error unsubscribing book:', error);
+                res.status(500).json({ message: 'Internal server error', success: false });
+            }
+        })
 
 
 
