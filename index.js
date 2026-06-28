@@ -31,6 +31,59 @@ async function run() {
         await client.connect();
         const database = client.db("biblio-drop");
         const booksCollection = database.collection("books");
+        const paymentCollection = database.collection("payments");
+        
+
+        // payment status
+
+        // get payment data based on userId
+        app.get('/api/payment-status/user', async (req, res) => {
+            try {
+                const userId = req.query.userId;
+                console.log("Received userId:", userId);
+                const query = userId ? { userId: userId } : {};
+                const paymentStatus = await paymentCollection.find(query).toArray();
+                res.status(200).json(paymentStatus);
+            }
+            catch (error) {
+                console.error('Error fetching payment status:', error);
+                res.status(500).json({ message: 'Internal server error' });
+            }
+        } );
+
+
+        // get data based on librarianId
+        app.get('/api/payment-status/librarian', async (req, res) => {
+            try {
+                const librarianId = req.query.librarianId;
+                console.log("Received librarianId:", librarianId);
+                const query = librarianId ? { librarianId: librarianId } : {};
+                const paymentStatus = await paymentCollection.find(query).toArray();
+                res.status(200).json(paymentStatus);
+            }
+            catch (error) {
+                console.error('Error fetching payment status:', error);
+                res.status(500).json({ message: 'Internal server error' });
+            }
+        } );
+
+        // payment info store
+        app.post('/api/payment-status', async (req, res) => {
+            const { session_id } = req.body;
+            const existingPayment = await paymentCollection.findOne({ session_id });
+            if (existingPayment) {
+                return res.status(400).json({ message: 'Payment status already exists for this session_id' });
+            }
+            try {
+                const paymentData = req.body;
+                const result = await paymentCollection.insertOne(paymentData);
+                res.status(201).json({ message: 'Payment status stored successfully', paymentId: result.insertedId });
+            } catch (error) {
+                console.error('Error storing payment status:', error);
+                res.status(500).json({ message: 'Internal server error' });
+            }
+        });
+        
 
         // get all books
         app.get('/api/allbooks', async (req, res) => {
