@@ -35,6 +35,56 @@ async function run() {
         const reviewsCollection = database.collection("reviews");
 
         ///  ======================= review api =====================
+
+        // patch review by reviewid
+        app.patch('/api/reviews/:id', async(req, res) => {
+            try{
+                const reviewId = req.params.id;
+                const query = { _id: new ObjectId(reviewId) };
+                const update = { $set: { comment: req.body.comment } };
+                const result = await reviewsCollection.updateOne(query, update);
+                if(result.modifiedCount === 1){
+                    res.status(200).json({ message: 'Review updated successfully', success: true });
+                } else {
+                    res.status(404).json({ message: 'Review not found', success: false });
+                }
+            }
+            catch(error){
+                console.error('Error updating review:', error);
+                res.status(500).json({ message: 'Internal server error', success: false });
+            }
+        })
+
+
+        // delete review by reviewId
+        app.delete('/api/reviews/:id', async (req, res) => {
+            try {
+                const reviewId = req.params.id;
+                const query = { _id: new ObjectId(reviewId) };
+                const result = await reviewsCollection.deleteOne(query);
+                if (result.deletedCount === 1) {
+                    res.status(200).json({ message: 'Review deleted successfully', success: true });
+                } else {
+                    res.status(404).json({ message: 'Review not found', success: false });
+                }
+            } catch (error) {
+                console.error('Error deleting review:', error);
+                res.status(500).json({ message: 'Internal server error', success: false });
+            }
+        });
+
+        // get review by userid 
+        app.get('/api/reviews/user/:userId', async (req, res) => {
+            try {
+                const userId = req.params.userId;
+                const query = { userId: userId };
+                const reviews = await reviewsCollection.find(query).toArray();
+                res.status(200).json(reviews);
+            } catch (error) {
+                console.error('Error fetching reviews by userId:', error);
+                res.status(500).json({ message: 'Internal server error' });
+            }
+        });
         // post review
         app.post('/api/reviews', async (req, res) => {
             try {
