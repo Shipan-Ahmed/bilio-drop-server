@@ -32,9 +32,53 @@ async function run() {
         const database = client.db("biblio-drop");
         const booksCollection = database.collection("books");
         const paymentCollection = database.collection("payments");
-        
+        const reviewsCollection = database.collection("reviews");
 
-        // payment status
+        ///  ======================= review api =====================
+        // post review
+        app.post('/api/reviews', async (req, res) => {
+            try {
+                const reviewData = req.body;
+                const result = await reviewsCollection.insertOne(reviewData);
+                res.status(201).json({ message: 'Review added successfully', reviewId: result.insertedId });
+            } catch (error) {
+                console.error('Error adding review:', error);
+                res.status(500).json({ message: 'Internal server error' });
+            }
+        });
+
+        // get reviews by bookId
+
+        app.get('/api/reviews/:id', async (req, res) => {
+            try {
+                const bookId = req.params.id;
+                const query = { bookId: bookId }; 
+                const reviews = await reviewsCollection.find(query).toArray();
+                res.status(200).json(reviews);
+            }
+            catch (error) {
+                console.error('Error fetching reviews:', error);
+                res.status(500).json({ message: 'Internal server error' });
+            }
+        });
+
+        // =================== payment status ==========================
+
+       app.get('/api/commentable/:bookId/userId', async (req, res) => {
+            try {
+                const bookId = req.params.bookId;
+                const userId = req.query.userId;
+                console.log("Received bookId:", bookId);
+                console.log("Received userId:", userId);
+                const query = { bookId: bookId, userId: userId, status: "Delivered" };
+                const commentable = await paymentCollection.findOne(query);
+                res.status(200).json({ commentable: !!commentable });
+           }
+            catch (error) {
+                console.error('Error checking commentable status:', error);
+                res.status(500).json({ message: 'Internal server error' });
+           }
+        });
 
         // get payment data based on userId
         app.get('/api/payment-status/user', async (req, res) => {
@@ -85,7 +129,7 @@ async function run() {
         });
         
 
-        // get all books
+        // =================== get all books ===========================
         app.get('/api/allbooks', async (req, res) => {
             try {
                 const books = await booksCollection.find({}).toArray();
