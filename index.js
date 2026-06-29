@@ -212,7 +212,37 @@ async function run() {
         
 
         // =================== get all books ===========================
-       
+
+        // aprove book by id adminStatus
+        app.patch('/api/books/:id/approve', async (req, res) => {
+            try {
+                const bookId = req.params.id;
+                const query = { _id: new ObjectId(bookId) };
+                const update = { $set: { adminStatus: 'approved' } };
+                const result = await booksCollection.updateOne(query, update);
+                if (result.modifiedCount === 1) {
+                    res.status(200).json({ message: 'Book approved successfully', success: true });
+                } else {
+                    res.status(404).json({ message: 'Book not found', success: false });
+                }
+            } catch (error) {
+                console.error('Error approving book:', error);
+                res.status(500).json({ message: 'Internal server error', success: false });
+            }
+        });
+
+        // admin pending books
+        app.get('/api/admin/pending-books', async (req, res) => {
+            try {
+                const pendingBooks = await booksCollection.find({ adminStatus: 'pending' }).toArray();
+                res.status(200).json(pendingBooks);
+            }
+            catch (error) {
+                console.error('Error fetching pending books:', error);
+                res.status(500).json({ message: 'Internal server error' });
+            }
+        });
+
         // update book by id
         app.patch('/api/books/:id', async (req, res) => {
             try {
@@ -256,6 +286,18 @@ async function run() {
             }
             catch (error) {
                 console.error('Error fetching books:', error);
+                res.status(500).json({ message: 'Internal server error' });
+            }
+        });
+
+        // get all books by adminStatus=approved
+        app.get('/api/books/approved', async (req, res) => {
+            try {
+                const books = await booksCollection.find({ adminStatus: 'approved' }).toArray();
+                res.status(200).json(books);
+            }
+            catch (error) {
+                console.error('Error fetching approved books:', error);
                 res.status(500).json({ message: 'Internal server error' });
             }
         });
