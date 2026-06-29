@@ -114,6 +114,25 @@ async function run() {
 
         // =================== payment status ==========================
 
+        app.patch('/api/deliveries/:bookId', async (req, res) => {
+            try {
+                const bookId = req.params.bookId;
+                const { status } = req.body;
+                const query = { bookId: bookId };
+                const update = { $set: { status: status } };
+                const result = await paymentCollection.updateOne(query, update);
+                if (result.modifiedCount === 1) {
+                    res.status(200).json({ message: 'Delivery status updated successfully', success: true });
+                }
+                else {
+                    res.status(404).json({ message: 'Delivery not found', success: false });
+                }
+            } catch (error) {
+                console.error('Error updating delivery status:', error);
+                res.status(500).json({ message: 'Internal server error', success: false });
+            }
+        });
+
        app.get('/api/commentable/:bookId/userId', async (req, res) => {
             try {
                 const bookId = req.params.bookId;
@@ -180,6 +199,43 @@ async function run() {
         
 
         // =================== get all books ===========================
+       
+        // update book by id
+        app.patch('/api/books/:id', async (req, res) => {
+            try {
+                const bookId = req.params.id;   
+                const updateData = req.body;
+                const query = { _id: new ObjectId(bookId) };
+                const update = { $set: updateData };
+                const result = await booksCollection.updateOne(query, update);
+                if (result.modifiedCount === 1) {
+                    res.status(200).json({ message: 'Book updated successfully', success: true });
+                } else {
+                    res.status(404).json({ message: 'Book not found', success: false });
+                }
+            } catch (error) {
+                console.error('Error updating book:', error);
+                res.status(500).json({ message: 'Internal server error', success: false });
+            }
+        });
+
+        // update book availability by id
+        app.patch('/api/books/:id/availability', async (req, res) => {
+            try {
+                const bookId = req.params.id;
+                const newAvailability = req.body.availability;
+                const query = { _id: new ObjectId(bookId) };
+                const update = { $set: { availability: newAvailability } };
+                const result = await booksCollection.updateOne(query, update);
+                res.status(200).json({ message: 'Book availability updated successfully', bookId: bookId });
+            } catch (error) {
+                console.error('Error updating book availability:', error);
+                res.status(500).json({ message: 'Internal server error' });
+            }
+        });
+
+
+        // get all books
         app.get('/api/allbooks', async (req, res) => {
             try {
                 const books = await booksCollection.find({}).toArray();
