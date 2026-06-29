@@ -36,6 +36,38 @@ async function run() {
         const usersCollection = database.collection("user");
 
         /// ======================= user api =====================
+        app.get('/api/admin/users', async (req, res) => {
+            const users = await usersCollection.find({}).toArray();
+            res.send(users);
+        });
+
+        app.patch('/api/admin/users', async (req, res) => {
+            const { userId, newRole } = req.body;
+            const filter = { _id: new ObjectId(userId) };
+            const updateDoc = { $set: { role: newRole } };
+            const result = await usersCollection.updateOne(filter, updateDoc);
+            res.send(result);
+        });
+
+
+        app.delete('/api/admin/users/:id', async (req, res) => {
+            try {
+                const id = req.params.id;
+                const query = { _id: new ObjectId(id) };
+                const result = await usersCollection.deleteOne(query);
+                if (result.deletedCount === 1) {
+                    res.status(200).json({ message: 'User deleted successfully', success: true });
+                } else {
+                    res.status(404).json({ message: 'User not found', success: false });
+                }   
+            }
+            catch (error) {
+                console.error('Error deleting user:', error);
+                res.status(500).json({ message: 'Internal server error', success: false });
+            }
+        });
+           
+
         app.get('/api/users', async (req, res) => {
             try {
                 const users = await usersCollection.find({}).toArray();
@@ -126,6 +158,20 @@ async function run() {
         });
 
         // =================== payment status ==========================
+
+
+        // all payment data 
+        app.get('/api/payments', async (req, res) => {
+            try {
+                const payments = await paymentCollection.find({}).toArray();
+                res.status(200).json(payments);
+            } catch (error) {
+                console.error('Error fetching payments:', error);
+                res.status(500).json({ message: 'Internal server error' });
+            }
+        });
+
+        // update delivery status by bookId
 
         app.patch('/api/deliveries/:bookId', async (req, res) => {
             try {
