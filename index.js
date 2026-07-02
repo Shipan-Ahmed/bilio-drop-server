@@ -14,8 +14,8 @@ app.use(cors());
 
 
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
-const uri = "mongodb+srv://biblio-drop:9LLVOdy216YfYfMH@cluster0.oldm8ln.mongodb.net/?appName=Cluster0";
-
+const uri = process.env.MONGODB_URI
+// const { createRemoteJWKSet, jwtVerify } = require("jose-cjs");
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
     serverApi: {
@@ -25,422 +25,518 @@ const client = new MongoClient(uri, {
     }
 });
 
-async function run() {
+// const JWKS = createRemoteJWKSet(
+//     new URL(`${process.env.CLIENT_URL}/api/auth/jwks`)
+// )
+
+// const verified = async (req, res, next) => {
+//     const header = req?.headers.authorization;
+//     console.log("header: ", header);
+//     if (!header) {
+//         return res.status(401).send({
+//             message: "Unauthorized",
+//         });
+//     }
+//     const token = header.split(" ")[1];
+
+//     if (!token) {
+//         return res.status(401).send({
+//             message: "Unauthorized",
+//         });
+//     }
+//     try {
+//         const { payload } = await jwtVerify(token, JWKS);
+//         console.log("payload:", payload);
+//         next();
+//     } catch (error) {
+//         console.log(error);
+//         return res.status(403).send({
+//             message: "Forbidden",
+//         });
+//     }
+// }
+
+// async function run() {
+//     try {
+//         // Connect the client to the server	(optional starting in v4.7)
+//         await client.connect();
+
+client.connect(() => {
+    console.log("Connected to MongoDB");
+}).catch(console.dir);
+
+
+const database = client.db("biblio-drop");
+const booksCollection = database.collection("books");
+const paymentCollection = database.collection("payments");
+const reviewsCollection = database.collection("reviews");
+const usersCollection = database.collection("user");
+
+/// ======================= user api =====================
+app.get('/api/admin/users', async (req, res) => {
+    const users = await usersCollection.find({}).toArray();
+    res.send(users);
+});
+
+app.patch('/api/admin/users',  async (req, res) => {
+    const { userId, newRole } = req.body;
+    const filter = { _id: new ObjectId(userId) };
+    const updateDoc = { $set: { role: newRole } };
+    const result = await usersCollection.updateOne(filter, updateDoc);
+    res.send(result);
+});
+
+
+app.delete('/api/admin/users/:id', async (req, res) => {
     try {
-        // Connect the client to the server	(optional starting in v4.7)
-        await client.connect();
-        const database = client.db("biblio-drop");
-        const booksCollection = database.collection("books");
-        const paymentCollection = database.collection("payments");
-        const reviewsCollection = database.collection("reviews");
-        const usersCollection = database.collection("user");
-
-        /// ======================= user api =====================
-        app.get('/api/admin/users', async (req, res) => {
-            const users = await usersCollection.find({}).toArray();
-            res.send(users);
-        });
-
-        app.patch('/api/admin/users', async (req, res) => {
-            const { userId, newRole } = req.body;
-            const filter = { _id: new ObjectId(userId) };
-            const updateDoc = { $set: { role: newRole } };
-            const result = await usersCollection.updateOne(filter, updateDoc);
-            res.send(result);
-        });
-
-
-        app.delete('/api/admin/users/:id', async (req, res) => {
-            try {
-                const id = req.params.id;
-                const query = { _id: new ObjectId(id) };
-                const result = await usersCollection.deleteOne(query);
-                if (result.deletedCount === 1) {
-                    res.status(200).json({ message: 'User deleted successfully', success: true });
-                } else {
-                    res.status(404).json({ message: 'User not found', success: false });
-                }   
-            }
-            catch (error) {
-                console.error('Error deleting user:', error);
-                res.status(500).json({ message: 'Internal server error', success: false });
-            }
-        });
-           
-
-        app.get('/api/users', async (req, res) => {
-            try {
-                const users = await usersCollection.find({}).toArray();
-                res.status(200).json(users);
-            } catch (error) {
-                console.error('Error fetching users:', error);
-                res.status(500).json({ message: 'Internal server error' });
-            }
-        });
-
-        
-        ///  ======================= review api =====================
-
-        // patch review by reviewid
-        app.patch('/api/reviews/:id', async(req, res) => {
-            try{
-                const reviewId = req.params.id;
-                const query = { _id: new ObjectId(reviewId) };
-                const update = { $set: { comment: req.body.comment } };
-                const result = await reviewsCollection.updateOne(query, update);
-                if(result.modifiedCount === 1){
-                    res.status(200).json({ message: 'Review updated successfully', success: true });
-                } else {
-                    res.status(404).json({ message: 'Review not found', success: false });
-                }
-            }
-            catch(error){
-                console.error('Error updating review:', error);
-                res.status(500).json({ message: 'Internal server error', success: false });
-            }
-        })
-
-
-        // delete review by reviewId
-        app.delete('/api/reviews/:id', async (req, res) => {
-            try {
-                const reviewId = req.params.id;
-                const query = { _id: new ObjectId(reviewId) };
-                const result = await reviewsCollection.deleteOne(query);
-                if (result.deletedCount === 1) {
-                    res.status(200).json({ message: 'Review deleted successfully', success: true });
-                } else {
-                    res.status(404).json({ message: 'Review not found', success: false });
-                }
-            } catch (error) {
-                console.error('Error deleting review:', error);
-                res.status(500).json({ message: 'Internal server error', success: false });
-            }
-        });
-
-        // get review by userid 
-        app.get('/api/reviews/user/:userId', async (req, res) => {
-            try {
-                const userId = req.params.userId;
-                const query = { userId: userId };
-                const reviews = await reviewsCollection.find(query).toArray();
-                res.status(200).json(reviews);
-            } catch (error) {
-                console.error('Error fetching reviews by userId:', error);
-                res.status(500).json({ message: 'Internal server error' });
-            }
-        });
-        // post review
-        app.post('/api/reviews', async (req, res) => {
-            try {
-                const reviewData = req.body;
-                const result = await reviewsCollection.insertOne(reviewData);
-                res.status(201).json({ message: 'Review added successfully', reviewId: result.insertedId });
-            } catch (error) {
-                console.error('Error adding review:', error);
-                res.status(500).json({ message: 'Internal server error' });
-            }
-        });
-
-        // get reviews by bookId
-
-        app.get('/api/reviews/:id', async (req, res) => {
-            try {
-                const bookId = req.params.id;
-                const query = { bookId: bookId }; 
-                const reviews = await reviewsCollection.find(query).toArray();
-                res.status(200).json(reviews);
-            }
-            catch (error) {
-                console.error('Error fetching reviews:', error);
-                res.status(500).json({ message: 'Internal server error' });
-            }
-        });
-
-        // =================== payment status ==========================
-
-
-        // all payment data 
-        app.get('/api/payments', async (req, res) => {
-            try {
-                const payments = await paymentCollection.find({}).toArray();
-                res.status(200).json(payments);
-            } catch (error) {
-                console.error('Error fetching payments:', error);
-                res.status(500).json({ message: 'Internal server error' });
-            }
-        });
-
-        // update delivery status by bookId
-
-        app.patch('/api/deliveries/:bookId', async (req, res) => {
-            try {
-                const bookId = req.params.bookId;
-                const { status } = req.body;
-                const query = { bookId: bookId };
-                const update = { $set: { status: status } };
-                const result = await paymentCollection.updateOne(query, update);
-                if (result.modifiedCount === 1) {
-                    res.status(200).json({ message: 'Delivery status updated successfully', success: true });
-                }
-                else {
-                    res.status(404).json({ message: 'Delivery not found', success: false });
-                }
-            } catch (error) {
-                console.error('Error updating delivery status:', error);
-                res.status(500).json({ message: 'Internal server error', success: false });
-            }
-        });
-
-       app.get('/api/commentable/:bookId/userId', async (req, res) => {
-            try {
-                const bookId = req.params.bookId;
-                const userId = req.query.userId;
-                console.log("Received bookId:", bookId);
-                console.log("Received userId:", userId);
-                const query = { bookId: bookId, userId: userId, status: "Delivered" };
-                const commentable = await paymentCollection.findOne(query);
-                res.status(200).json({ commentable: !!commentable });
-           }
-            catch (error) {
-                console.error('Error checking commentable status:', error);
-                res.status(500).json({ message: 'Internal server error' });
-           }
-        });
-
-        // get payment data based on userId
-        app.get('/api/payment-status/user', async (req, res) => {
-            try {
-                const userId = req.query.userId;
-                console.log("Received userId:", userId);
-                const query = userId ? { userId: userId } : {};
-                const paymentStatus = await paymentCollection.find(query).toArray();
-                res.status(200).json(paymentStatus);
-            }
-            catch (error) {
-                console.error('Error fetching payment status:', error);
-                res.status(500).json({ message: 'Internal server error' });
-            }
-        } );
-
-
-        // get data based on librarianId
-        app.get('/api/payment-status/librarian', async (req, res) => {
-            try {
-                const librarianId = req.query.librarianId;
-                console.log("Received librarianId:", librarianId);
-                const query = librarianId ? { librarianId: librarianId } : {};
-                const paymentStatus = await paymentCollection.find(query).toArray();
-                res.status(200).json(paymentStatus);
-            }
-            catch (error) {
-                console.error('Error fetching payment status:', error);
-                res.status(500).json({ message: 'Internal server error' });
-            }
-        } );
-
-        // payment info store
-        app.post('/api/payment-status', async (req, res) => {
-            const { session_id } = req.body;
-            const existingPayment = await paymentCollection.findOne({ session_id });
-            if (existingPayment) {
-                return res.status(400).json({ message: 'Payment status already exists for this session_id' });
-            }
-            try {
-                const paymentData = req.body;
-                const result = await paymentCollection.insertOne(paymentData);
-                res.status(201).json({ message: 'Payment status stored successfully', paymentId: result.insertedId });
-            } catch (error) {
-                console.error('Error storing payment status:', error);
-                res.status(500).json({ message: 'Internal server error' });
-            }
-        });
-        
-
-        // =================== get all books ===========================
-
-        // aprove book by id adminStatus
-        app.patch('/api/books/:id/approve', async (req, res) => {
-            try {
-                const bookId = req.params.id;
-                const query = { _id: new ObjectId(bookId) };
-                const update = { $set: { adminStatus: 'approved' } };
-                const result = await booksCollection.updateOne(query, update);
-                if (result.modifiedCount === 1) {
-                    res.status(200).json({ message: 'Book approved successfully', success: true });
-                } else {
-                    res.status(404).json({ message: 'Book not found', success: false });
-                }
-            } catch (error) {
-                console.error('Error approving book:', error);
-                res.status(500).json({ message: 'Internal server error', success: false });
-            }
-        });
-
-        // admin pending books
-        app.get('/api/admin/pending-books', async (req, res) => {
-            try {
-                const pendingBooks = await booksCollection.find({ adminStatus: 'pending' }).toArray();
-                res.status(200).json(pendingBooks);
-            }
-            catch (error) {
-                console.error('Error fetching pending books:', error);
-                res.status(500).json({ message: 'Internal server error' });
-            }
-        });
-
-        // update book by id
-        app.patch('/api/books/:id', async (req, res) => {
-            try {
-                const bookId = req.params.id;   
-                const updateData = req.body;
-                const query = { _id: new ObjectId(bookId) };
-                const update = { $set: updateData };
-                const result = await booksCollection.updateOne(query, update);
-                if (result.modifiedCount === 1) {
-                    res.status(200).json({ message: 'Book updated successfully', success: true });
-                } else {
-                    res.status(404).json({ message: 'Book not found', success: false });
-                }
-            } catch (error) {
-                console.error('Error updating book:', error);
-                res.status(500).json({ message: 'Internal server error', success: false });
-            }
-        });
-
-        // update book availability by id
-        app.patch('/api/books/:id/availability', async (req, res) => {
-            try {
-                const bookId = req.params.id;
-                const newAvailability = req.body.availability;
-                const query = { _id: new ObjectId(bookId) };
-                const update = { $set: { availability: newAvailability } };
-                const result = await booksCollection.updateOne(query, update);
-                res.status(200).json({ message: 'Book availability updated successfully', bookId: bookId });
-            } catch (error) {
-                console.error('Error updating book availability:', error);
-                res.status(500).json({ message: 'Internal server error' });
-            }
-        });
-
-
-        // get all books
-        app.get('/api/allbooks', async (req, res) => {
-            try {
-                const books = await booksCollection.find({}).toArray();
-                res.status(200).json(books);
-            }
-            catch (error) {
-                console.error('Error fetching books:', error);
-                res.status(500).json({ message: 'Internal server error' });
-            }
-        });
-
-        // get all books by adminStatus=approved
-        app.get('/api/books/approved', async (req, res) => {
-            try {
-                const books = await booksCollection.find({ adminStatus: 'approved' }).toArray();
-                res.status(200).json(books);
-            }
-            catch (error) {
-                console.error('Error fetching approved books:', error);
-                res.status(500).json({ message: 'Internal server error' });
-            }
-        });
-
-        // book details by id
-        app.get('/api/books/:id', async (req, res) => {
-            try {
-                const bookId = req.params.id;
-                const query = { _id: new ObjectId(bookId) };
-                const book = await booksCollection.findOne(query);
-                if (book) {
-                    res.status(200).json(book);
-                } else {
-                    res.status(404).json({ message: 'Book not found' });
-                }
-            }
-            catch (error) {
-                console.error('Error fetching book details:', error);
-                res.status(500).json({ message: 'Internal server error' });
-            }
-        });
-
-        // get  books based on librarianId
-        app.get('/api/books', async (req, res) => {
-            try {
-                const librarianId = req.query.librarianId;
-                console.log("Received librarianId:", librarianId);
-                const query = librarianId? { librarianId: librarianId } : {};
-                const books = await booksCollection.find(query).toArray();
-                res.status(200).json(books);
-            } catch (error) {
-                console.error('Error fetching books:', error);
-                res.status(500).json({ message: 'Internal server error' });
-            }
-        });
-
-        // add a new book 
-        app.post('/api/books', async (req, res) => {
-            try {
-                const bookData = req.body;
-                const result = await booksCollection.insertOne(bookData);
-                res.status(201).json({ message: 'Book added successfully', bookId: result.insertedId });
-            }
-            catch (error) {
-                console.error('Error adding book:', error);
-                res.status(500).json({ message: 'Internal server error' });
-            }
-        })
-
-        // delete a book by id
-        app.delete('/api/books/:id', async (req, res) => {
-            try {
-                const bookId = req.params.id;
-                const query = {_id: new ObjectId(bookId)};
-                const result = await booksCollection.deleteOne(query);
-                if (result.deletedCount === 1) {
-                    res.status(200).json({ message: 'Book deleted successfully', success: true });
-                } else {
-                    res.status(404).json({ message: 'Book not found', success: false });
-                }
-            }
-            catch (error) {
-                console.error('Error deleting book:', error);
-                res.status(500).json({ message: 'Internal server error', success: false });
-            }
-        })
-
-        // update a book by id
-        app.patch('/api/books/:id/unpublish', async (req, res) => {
-            try {
-                const bookId = req.params.id;
-                const query = { _id: new ObjectId(bookId) };
-                const update = { $set: { status: 'Unpublished' } };
-                const result = await booksCollection.updateOne(query, update);
-                if (result.modifiedCount === 1) {
-                    res.status(200).json({ message: 'Book unpublished successfully', success: true });
-                } else {
-                    res.status(404).json({ message: 'Book not found', success: false });
-                }
-            }
-            catch (error) {
-                console.error('Error unsubscribing book:', error);
-                res.status(500).json({ message: 'Internal server error', success: false });
-            }
-        })
-
-
-
-        // Send a ping to confirm a successful connection
-        await client.db("admin").command({ ping: 1 });
-        console.log("Pinged your deployment. You successfully connected to MongoDB!");
-    } finally {
-        // Ensures that the client will close when you finish/error
-        // await client.close();
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const result = await usersCollection.deleteOne(query);
+        if (result.deletedCount === 1) {
+            res.status(200).json({ message: 'User deleted successfully', success: true });
+        } else {
+            res.status(404).json({ message: 'User not found', success: false });
+        }
     }
-}
-run().catch(console.dir);
+    catch (error) {
+        console.error('Error deleting user:', error);
+        res.status(500).json({ message: 'Internal server error', success: false });
+    }
+});
+
+
+app.get('/api/users',  async (req, res) => {
+    try {
+        const users = await usersCollection.find({}).toArray();
+        res.status(200).json(users);
+    } catch (error) {
+        console.error('Error fetching users:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
+
+///  ======================= review api =====================
+
+// patch review by reviewid
+app.patch('/api/reviews/:id', async (req, res) => {
+    try {
+        const reviewId = req.params.id;
+        const query = { _id: new ObjectId(reviewId) };
+        const update = { $set: { comment: req.body.comment } };
+        const result = await reviewsCollection.updateOne(query, update);
+        if (result.modifiedCount === 1) {
+            res.status(200).json({ message: 'Review updated successfully', success: true });
+        } else {
+            res.status(404).json({ message: 'Review not found', success: false });
+        }
+    }
+    catch (error) {
+        console.error('Error updating review:', error);
+        res.status(500).json({ message: 'Internal server error', success: false });
+    }
+})
+
+
+// delete review by reviewId
+app.delete('/api/reviews/:id', async (req, res) => {
+    try {
+        const reviewId = req.params.id;
+        const query = { _id: new ObjectId(reviewId) };
+        const result = await reviewsCollection.deleteOne(query);
+        if (result.deletedCount === 1) {
+            res.status(200).json({ message: 'Review deleted successfully', success: true });
+        } else {
+            res.status(404).json({ message: 'Review not found', success: false });
+        }
+    } catch (error) {
+        console.error('Error deleting review:', error);
+        res.status(500).json({ message: 'Internal server error', success: false });
+    }
+});
+
+// get review by userid 
+app.get('/api/reviews/user/:userId', async (req, res) => {
+    try {
+        const userId = req.params.userId;
+        const query = { userId: userId };
+        const reviews = await reviewsCollection.find(query).toArray();
+        res.status(200).json(reviews);
+    } catch (error) {
+        console.error('Error fetching reviews by userId:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+// post review
+app.post('/api/reviews', async (req, res) => {
+    try {
+        const reviewData = req.body;
+        const result = await reviewsCollection.insertOne(reviewData);
+        res.status(201).json({ message: 'Review added successfully', reviewId: result.insertedId });
+    } catch (error) {
+        console.error('Error adding review:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
+// get reviews by bookId
+
+app.get('/api/reviews/:id', async (req, res) => {
+    try {
+        const bookId = req.params.id;
+        const query = { bookId: bookId };
+        const reviews = await reviewsCollection.find(query).toArray();
+        res.status(200).json(reviews);
+    }
+    catch (error) {
+        console.error('Error fetching reviews:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
+// =================== payment status ==========================
+
+
+// all payment data 
+app.get('/api/payments', async (req, res) => {
+    try {
+        const payments = await paymentCollection.find({}).toArray();
+        res.status(200).json(payments);
+    } catch (error) {
+        console.error('Error fetching payments:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
+// update delivery status by bookId
+
+app.patch('/api/deliveries/:bookId', async (req, res) => {
+    try {
+        const bookId = req.params.bookId;
+        const { status } = req.body;
+        const query = { bookId: bookId };
+        const update = { $set: { status: status } };
+        const result = await paymentCollection.updateOne(query, update);
+        if (result.modifiedCount === 1) {
+            res.status(200).json({ message: 'Delivery status updated successfully', success: true });
+        }
+        else {
+            res.status(404).json({ message: 'Delivery not found', success: false });
+        }
+    } catch (error) {
+        console.error('Error updating delivery status:', error);
+        res.status(500).json({ message: 'Internal server error', success: false });
+    }
+});
+
+app.get('/api/commentable/:bookId/userId', async (req, res) => {
+    try {
+        const bookId = req.params.bookId;
+        const userId = req.query.userId;
+        console.log("Received bookId:", bookId);
+        console.log("Received userId:", userId);
+        const query = { bookId: bookId, userId: userId, status: "Delivered" };
+        const commentable = await paymentCollection.findOne(query);
+        res.status(200).json({ commentable: !!commentable });
+    }
+    catch (error) {
+        console.error('Error checking commentable status:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
+// get payment data based on userId
+app.get('/api/payment-status/user', async (req, res) => {
+    try {
+        const userId = req.query.userId;
+        console.log("Received userId:", userId);
+        const query = userId ? { userId: userId } : {};
+        const paymentStatus = await paymentCollection.find(query).toArray();
+        res.status(200).json(paymentStatus);
+    }
+    catch (error) {
+        console.error('Error fetching payment status:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
+
+// get data based on librarianId
+app.get('/api/payment-status/librarian', async (req, res) => {
+    try {
+        const librarianId = req.query.librarianId;
+        console.log("Received librarianId:", librarianId);
+        const query = librarianId ? { librarianId: librarianId } : {};
+        const paymentStatus = await paymentCollection.find(query).toArray();
+        res.status(200).json(paymentStatus);
+    }
+    catch (error) {
+        console.error('Error fetching payment status:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
+// payment info store
+app.post('/api/payment-status', async (req, res) => {
+    const { session_id } = req.body;
+    const existingPayment = await paymentCollection.findOne({ session_id });
+    if (existingPayment) {
+        return res.status(400).json({ message: 'Payment status already exists for this session_id' });
+    }
+    try {
+        const paymentData = req.body;
+        const result = await paymentCollection.insertOne(paymentData);
+        res.status(201).json({ message: 'Payment status stored successfully', paymentId: result.insertedId });
+    } catch (error) {
+        console.error('Error storing payment status:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
+
+// =================== get all books ===========================
+
+// aprove book by id adminStatus
+app.patch('/api/books/:id/approve', async (req, res) => {
+    try {
+        const bookId = req.params.id;
+        const query = { _id: new ObjectId(bookId) };
+        const update = { $set: { adminStatus: 'approved' } };
+        const result = await booksCollection.updateOne(query, update);
+        if (result.modifiedCount === 1) {
+            res.status(200).json({ message: 'Book approved successfully', success: true });
+        } else {
+            res.status(404).json({ message: 'Book not found', success: false });
+        }
+    } catch (error) {
+        console.error('Error approving book:', error);
+        res.status(500).json({ message: 'Internal server error', success: false });
+    }
+});
+
+// admin pending books
+app.get('/api/admin/pending-books', async (req, res) => {
+    try {
+        const pendingBooks = await booksCollection.find({ adminStatus: 'pending' }).toArray();
+        res.status(200).json(pendingBooks);
+    }
+    catch (error) {
+        console.error('Error fetching pending books:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
+// update book by id
+app.patch('/api/books/:id', async (req, res) => {
+    try {
+        const bookId = req.params.id;
+        const updateData = req.body;
+        const query = { _id: new ObjectId(bookId) };
+        const update = { $set: updateData };
+        const result = await booksCollection.updateOne(query, update);
+        if (result.modifiedCount === 1) {
+            res.status(200).json({ message: 'Book updated successfully', success: true });
+        } else {
+            res.status(404).json({ message: 'Book not found', success: false });
+        }
+    } catch (error) {
+        console.error('Error updating book:', error);
+        res.status(500).json({ message: 'Internal server error', success: false });
+    }
+});
+
+// update book availability by id
+app.patch('/api/books/:id/availability', async (req, res) => {
+    try {
+        const bookId = req.params.id;
+        const newAvailability = req.body.availability;
+        const query = { _id: new ObjectId(bookId) };
+        const update = { $set: { availability: newAvailability } };
+        const result = await booksCollection.updateOne(query, update);
+        res.status(200).json({ message: 'Book availability updated successfully', bookId: bookId });
+    } catch (error) {
+        console.error('Error updating book availability:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
+
+// get all books
+app.get('/api/allbooks', async (req, res) => {
+    try {
+        const books = await booksCollection.find({}).toArray();
+        res.status(200).json(books);
+    }
+    catch (error) {
+        console.error('Error fetching books:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
+// get all books by adminStatus=approved
+// app.get('/api/books/approved', async (req, res) => {
+//     try {
+//         const books = await booksCollection.find({ adminStatus: 'approved' }).toArray();
+//         res.status(200).json(books);
+//     }
+//     catch (error) {
+//         console.error('Error fetching approved books:', error);
+//         res.status(500).json({ message: 'Internal server error' });
+//     }
+// });
+
+// get all books by adminStatus=approved with Search, Filters & Server-Side Pagination
+// get all books by adminStatus=approved with Search, Filters & Server-Side Pagination
+app.get('/api/books/approved', async (req, res) => {
+    try {
+        const { search, category, maxFee, availability, page, limit } = req.query;
+
+        let query = { adminStatus: 'approved' };
+
+        if (search) {
+            query.title = { $regex: search, $options: 'i' };
+        }
+
+        if (category && category !== 'all') {
+            query.category = category;
+        }
+
+        if (maxFee) {
+            query.deliveryFee = { $lte: parseFloat(maxFee) };
+        }
+
+        if (availability === 'available') {
+            query.quantity = { $gt: 0 };
+            query.availability = "true";
+        } else if (availability === 'unavailable') {
+            query.$or = [
+                { quantity: { $eq: 0 } },
+                { availability: "false" }
+            ];
+        }
+
+        // Exact 8 items per page tracking setup default fallback override
+        const pageNum = parseInt(page) || 1;
+        const limitNum = parseInt(limit) || 8;
+        const skipNum = (pageNum - 1) * limitNum;
+
+        const totalItems = await booksCollection.countDocuments(query);
+        const totalPages = Math.ceil(totalItems / limitNum);
+
+        const books = await booksCollection.find(query)
+            .skip(skipNum)
+            .limit(limitNum)
+            .toArray();
+
+        res.status(200).json({
+            books,
+            totalPages,
+            currentPage: pageNum,
+            totalItems
+        });
+    }
+    catch (error) {
+        console.error('Error fetching approved books:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
+// book details by id
+app.get('/api/books/:id', async (req, res) => {
+    try {
+        const bookId = req.params.id;
+        const query = { _id: new ObjectId(bookId) };
+        const book = await booksCollection.findOne(query);
+        if (book) {
+            res.status(200).json(book);
+        } else {
+            res.status(404).json({ message: 'Book not found' });
+        }
+    }
+    catch (error) {
+        console.error('Error fetching book details:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
+// get  books based on librarianId
+app.get('/api/books',  async (req, res) => {
+    try {
+        const librarianId = req.query.librarianId;
+        console.log("Received librarianId:", librarianId);
+        const query = librarianId ? { librarianId: librarianId } : {};
+        const books = await booksCollection.find(query).toArray();
+        res.status(200).json(books);
+    } catch (error) {
+        console.error('Error fetching books:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
+// add a new book 
+app.post('/api/books',  async (req, res) => {
+    try {
+        const bookData = req.body;
+        const result = await booksCollection.insertOne(bookData);
+        res.status(201).json({ message: 'Book added successfully', bookId: result.insertedId });
+    }
+    catch (error) {
+        console.error('Error adding book:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+})
+
+// delete a book by id
+app.delete('/api/books/:id', async (req, res) => {
+    try {
+        const bookId = req.params.id;
+        const query = { _id: new ObjectId(bookId) };
+        const result = await booksCollection.deleteOne(query);
+        if (result.deletedCount === 1) {
+            res.status(200).json({ message: 'Book deleted successfully', success: true });
+        } else {
+            res.status(404).json({ message: 'Book not found', success: false });
+        }
+    }
+    catch (error) {
+        console.error('Error deleting book:', error);
+        res.status(500).json({ message: 'Internal server error', success: false });
+    }
+})
+
+// update a book by id
+app.patch('/api/books/:id/unpublish', async (req, res) => {
+    try {
+        const bookId = req.params.id;
+        const adminStatus = req.query.adminStatus; // Get the adminStatus from query parameters
+        console.log("Received bookId:", bookId);
+        console.log("Received adminStatus:", adminStatus);
+        const query = { _id: new ObjectId(bookId) };
+        const update = { $set: { adminStatus: adminStatus } };
+        const result = await booksCollection.updateOne(query, update);
+        if (result.modifiedCount === 1) {
+            res.status(200).json({ message: 'Book unpublished successfully', success: true });
+        } else {
+            res.status(404).json({ message: 'Book not found', success: false });
+        }
+    }
+    catch (error) {
+        console.error('Error unsubscribing book:', error);
+        res.status(500).json({ message: 'Internal server error', success: false });
+    }
+})
+
+
+
+// Send a ping to confirm a successful connection
+// await client.db("admin").command({ ping: 1 });
+//         console.log("Pinged your deployment. You successfully connected to MongoDB!");
+//     } finally {
+//         // Ensures that the client will close when you finish/error
+//         // await client.close();
+//     }
+// }
+// run().catch(console.dir);
 
 
 
@@ -451,3 +547,6 @@ app.get('/', (req, res) => {
 app.listen(port, () => {
     console.log(`Example app listening on port ${port}`);
 });
+
+
+module.exports = app;
